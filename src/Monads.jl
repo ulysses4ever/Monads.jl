@@ -96,8 +96,10 @@ bind(f::Function, m::Identity) = f(m.value)
 ## List
 type MList <: MonadPlus
     value :: Vector
+
+    MList(x::Array) = new(vec(x))
+    MList(x) = new([x])
 end
-MList(v) = MList([v])
 
 function join(m::MList)
     if !isempty(m.value)
