@@ -28,7 +28,7 @@ import juliadoc
 extensions = ['sphinx.ext.mathjax', 'juliadoc.julia', 'juliadoc.jlhelp']
 
 # Add any paths that contain templates here, relative to this directory.
-#templates_path = ['_templates']
+templates_path = [juliadoc.get_templates_dir()]
 
 # The suffix of source filenames.
 source_suffix = '.rst'
