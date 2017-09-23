@@ -3,7 +3,7 @@ module Monads
 # types
 export Monad, Identity, MList, Maybe, State
 # combinators
-export mreturn, join, fmap, bind, mcomp, mthen, (>>)
+export mreturn, join, fmap, mbind, mcomp, mthen, (>>)
 # utilities
 export liftM
 # do syntax
@@ -13,20 +13,20 @@ export MonadPlus, mzero, mplus, guard
 # State
 export runState, put, get, evalState, execState
 
-abstract Monad
-abstract MonadPlus <: Monad
+abstract type Monad{T} end 
+abstract type MonadPlus{T} <: Monad{T} end
 
 ## Buy two monad combinators, get the third free!
-mreturn{M<:Monad}(::Type{M}, val) = M(val)
-join(m::Monad) = bind(identity, m)
-fmap{M<:Monad}(f::Function, m::M) = bind(m) do x
+mreturn(::Type{M}, val :: T) where {T, M<:Monad} = M{T}(val)
+join(m::Monad) = mbind(identity, m)
+fmap{M<:Monad}(f::Function, m::M) = mbind(m) do x
     mreturn(M, f(x))
 end
-bind(f::Function, m::Monad) = join(fmap(f, m))
+mbind(f::Function, m::Monad) = join(fmap(f, m))
 
 ## Extra combinators
-mcomp(g::Function, f::Function) = x -> bind(g, f(x))
-mthen(k::Monad, m::Monad) = bind(_ -> k, m)
+mcomp(g::Function, f::Function) = x -> mbind(g, f(x))
+mthen(k::Monad, m::Monad) = mbind(_ -> k, m)
 (>>)(m::Monad, k::Monad) = mthen(k, m)
 
 ## A MonadPlus function
@@ -55,10 +55,10 @@ end
 mdo_desugar(exprIn) = reduce(mdo_desugar_helper, :(), reverse(exprIn.args))
 mdo_desugar_helper(rest, expr) = rest
 function mdo_desugar_helper(rest, expr::Expr)
-    if expr.head == :call && expr.args[1] == :(<-)
-        # replace "<-" with monadic binding
+    if expr.head == :call && expr.args[1] == :(<|)
+        # replace "<|" with monadic binding
         quote
-            bind($(expr.args[3])) do $(expr.args[2])
+            mbind($(expr.args[3])) do $(expr.args[2])
                 $rest
             end
         end
@@ -82,45 +82,34 @@ end
 
 ## Function lifting
 liftM{M<:Monad}(::Type{M}, f::Function) = m1 -> @mdo M begin
-    x1 <- m1
+    x1 <| m1
     return f(x1)
 end
 
 ## Starting slow: Identity
-type Identity{T} <: Monad
+type Identity{T} <: Monad{T}
     value :: T
 end
 
-bind(f::Function, m::Identity) = f(m.value)
+mbind(f::Function, m::Identity) = f(m.value)
 
 ## List
-type MList <: MonadPlus
-    value :: Vector
-
-    MList(x::Array) = new(vec(x))
-    MList(x) = new([x])
+mutable struct MList{T} <: MonadPlus{T}
+    value :: Vector{T}
+    
+    MList{T}(x :: Vector{T}) where T = new{T}(x)
+    MList{T}(x :: T) where T = new{T}([x])
 end
 
-function join(m::MList)
-    if !isempty(m.value)
-        val = nothing
-        for arr in m.value[1:end]
-            if !isempty(arr.value)
-                if val === nothing
-                    val = arr.value
-                else
-                    append!(val, arr.value)
-                end
-            end
-        end
-        if val === nothing
-            mzero(MList)
-        else
-            mreturn(MList, val)
-        end
-    else
-        mzero(MList)
-    end
+MList(x :: Vector{T}) where T = MList{T}(x)
+MList(x :: T) where T = MList{T}([x])
+
+function join(mm :: MList{MList{T}}) where T
+    MList{T}(
+     foldl(
+       (v,m) -> vcat(v, m.value), 
+       T[], 
+       mm.value))
 end
 fmap(f::Function, m::MList) = MList(map(f, m.value))
 
@@ -128,15 +117,19 @@ fmap(f::Function, m::MList) = MList(map(f, m.value))
 mzero(::Type{MList}) = MList([])
 mplus(m1::MList, m2::MList) = join(MList([m1, m2]))
 
+import Base.==
+==(l1 :: MList{T}, l2 :: MList{T}) where T =
+    l1.value == l2.value
+
 ## Maybe
-type Maybe{T} <: Monad
-    value :: Union(T, Nothing)
+mutable struct Maybe{T} <: Monad{T}
+    value :: Union{T, Void}
 end
 
-bind(f::Function, m::Maybe) = isa(m.value, Nothing) ? Maybe(nothing) : f(m.value)
+mbind(f::Function, m::Maybe{T}) where T = isa(m.value, Nothing) ? Maybe{T}(nothing) : f(m.value)
 
 ## State
-type State <: Monad
+type State{T} <: Monad{T}
     runState :: Function # s -> (a, s)
 end
 state(f) = State(f)
@@ -144,7 +137,7 @@ state(f) = State(f)
 runState(s::State) = s.runState
 runState(s::State, st) = s.runState(st)
 
-function bind(f::Function, s::State)
+function mbind(f::Function, s::State)
       state(st -> begin
           (x, stp) = runState(s, st)
           runState(f(x), stp)
