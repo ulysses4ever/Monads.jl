@@ -31,7 +31,7 @@ With the ``Maybe`` monad, we can immediately terminate a computation that produc
     Maybe{Int64}(5)
 
     julia> @mdo Maybe begin
-             m <- Maybe(match(r"a", "bbbbc"))
+             m <| Maybe(match(r"a", "bbbbc"))
              return m.offset
            end
     Maybe{Nothing}(nothing)
@@ -51,7 +51,7 @@ Types
 -----
 
 ``Monad``
-    The base monad type. New monads should be subtypes of this type, and must implement either ``fmap`` and ``bind``, or ``join`` (the default ``mreturn`` is usually acceptable).
+    The base monad type. New monads should be subtypes of this type, and must implement either ``fmap`` and ``mbind``, or ``join`` (the default ``mreturn`` is usually acceptable).
 
 ``Identity``
     The identity monad. While it isn't very interesting, it might be a good reference if you are implementing your own monads.
@@ -88,7 +88,7 @@ Methods
 
 .. function:: join(m)
 
-    Join should flatten one level of monadic structure, ending in at least one monadic wrapper, equivalent to ``bind(identity, m)``
+    Join should flatten one level of monadic structure, ending in at least one monadic wrapper, equivalent to ``mbind(identity, m)``
 
 .. function:: mreturn(M, val)
 
@@ -96,7 +96,7 @@ Methods
 
 .. function:: mcomp(g, f)
 
-    Composition of two monadic functions. Equivalent to ``x -> bind(g, f(x))``.
+    Composition of two monadic functions. Equivalent to ``x -> mbind(g, f(x))``.
 
 .. function:: mthen(k, m)
 
@@ -118,13 +118,13 @@ Methods
 Implementing a monad
 --------------------
 
-To implement your own monad, you will need to create a new type that is a subtype of either ``Monad`` or ``MonadPlus`` and implements either ``bind`` and ``fmap``, or ``join``, each of which you will need to ``import`` from ``Monads``. The methods you define should obey the following rules::
+To implement your own monad, you will need to create a new type that is a subtype of either ``Monad`` or ``MonadPlus`` and implements either ``mbind`` and ``fmap``, or ``join``, each of which you will need to ``import`` from ``Monads``. The methods you define should obey the following rules::
 
     mbind(f, mreturn(M, a))) == f(a)
 
     mbind((x) -> mreturn(M, x), m) == m
 
-    mbind(g, bind(f, m)) == mbind((x) -> mbind(g, f(x)), m)
+    mbind(g, mbind(f, m)) == mbind((x) -> mbind(g, f(x)), m)
 
 If your monad type is a subtype of ``MonadPlus``, it should also define the additional functions ``mplus``, which combines instances of the monad, and ``mzero``, which is the identity under ``mplus``. It should obey the following rules::
 
