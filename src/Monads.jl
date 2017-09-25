@@ -1,8 +1,13 @@
 module Monads
 
-# types
+#
+#
+#    Interface
+#
+#
+# types: Monad and its instances
 export Monad, Identity, MList, Maybe, State
-# combinators
+# combinators (MOnad methods)
 export mreturn, join, fmap, mbind, mcomp, mthen, (>>)
 # utilities
 export liftM
@@ -15,6 +20,12 @@ export runState, put, get, evalState, execState
 
 abstract type Monad{T} end 
 abstract type MonadPlus{T} <: Monad{T} end
+
+#
+#
+# Stubs for all monad methods
+#
+#
 
 ## Buy two monad combinators, get the third free!
 mreturn(::Type{M}, val :: T) where {T, M<:Monad} = M{T}(val)
@@ -31,6 +42,13 @@ mthen(k::Monad, m::Monad) = mbind(_ -> k, m)
 
 ## A MonadPlus function
 guard{M<:MonadPlus}(::Type{M}, c::Bool) = c ? mreturn(M, nothing) : mzero(M)
+
+
+#
+#
+# Macro for do-blocks (implementation)
+#
+#
 
 ## Friendly monad blocks
 macro mdo(mtype, body)
@@ -86,14 +104,26 @@ liftM{M<:Monad}(::Type{M}, f::Function) = m1 -> @mdo M begin
     return f(x1)
 end
 
+#                                                       #
+#                                                       #
+#                      Monad instances                  #
+#                                                       #
+#                                                       #
+
+#
 ## Starting slow: Identity
+#
+
 type Identity{T} <: Monad{T}
     value :: T
 end
 
 mbind(f::Function, m::Identity) = f(m.value)
 
+#
 ## List
+#
+
 mutable struct MList{T} <: MonadPlus{T}
     value :: Vector{T}
     
@@ -121,14 +151,21 @@ import Base.==
 ==(l1 :: MList{T}, l2 :: MList{T}) where T =
     l1.value == l2.value
 
+#
 ## Maybe
+#
+
 mutable struct Maybe{T} <: Monad{T}
     value :: Union{T, Void}
 end
 
-mbind(f::Function, m::Maybe{T}) where T = isa(m.value, Nothing) ? Maybe{T}(nothing) : f(m.value)
+mbind(f::Function, m::Maybe{T}) where T = 
+    isa(m.value, Nothing) ? Maybe{T}(nothing) : f(m.value)
 
+#
 ## State
+#
+
 type State{T} <: Monad{T}
     runState :: Function # s -> (a, s)
 end
@@ -153,3 +190,4 @@ evalState(s::State, st) = runState(s, st)[1]
 execState(s::State, st) = runState(s, st)[2]
 
 end
+

@@ -1,12 +1,10 @@
 module Test
 
-# using Monads; while developing:
-include("../src/Monads.jl")
-using Test.Monads
-
+using Monads
 using Base.Test
 
 @testset "Tests for list monad (MList)" begin
+    @test mreturn(MList, 1) == MList([1])
     @test mbind(x -> MList([x, 3]), MList([1,2])) == MList([1,3,2,3])
     @test (@mdo MList begin
                 a <| MList([1,2,3])
