@@ -6,4 +6,4 @@ A straightforward implementation of monads, complete with Haskell-style syntacti
 Documentation
 =============
 
-More complete documentation can be found on [Read The Docs](https://monadsjl.readthedocs.org/en/latest/).
+More complete documentation can be found on [in the doc file](doc/index.rst).
