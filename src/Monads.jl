@@ -10,7 +10,7 @@ export Monad, Identity, MList, Maybe, State
 # combinators (MOnad methods)
 export mreturn, join, fmap, mbind, mcomp, mthen, (>>)
 # utilities
-export liftM
+export liftM, Unit, mapM
 # do syntax
 export @mdo
 # MonadPlus
@@ -20,6 +20,7 @@ export runState, put, get, evalState, execState
 
 abstract type Monad{T} end 
 abstract type MonadPlus{T} <: Monad{T} end
+struct Unit end
 
 #
 #
@@ -29,20 +30,27 @@ abstract type MonadPlus{T} <: Monad{T} end
 
 ## Buy two monad combinators, get the third free!
 mreturn(::Type{M}, val :: T) where {T, M<:Monad} = M{T}(val)
+
 join(m::Monad) = mbind(identity, m)
+
 fmap{M<:Monad}(f::Function, m::M) = mbind(m) do x
     mreturn(M, f(x))
 end
+
 mbind(f::Function, m::Monad) = join(fmap(f, m))
 
 ## Extra combinators
 mcomp(g::Function, f::Function) = x -> mbind(g, f(x))
-mthen(k::Monad, m::Monad) = mbind(_ -> k, m)
-(>>)(m::Monad, k::Monad) = mthen(k, m)
 
-## A MonadPlus function
-guard{M<:MonadPlus}(::Type{M}, c::Bool) = c ? mreturn(M, nothing) : mzero(M)
+mthen(m::Monad, k::Monad) = mbind(_ -> k, m)
 
+(>>)(m::Monad, k::Monad) = mthen(m, k)
+
+## MonadPlus functions
+guard(::Type{M}, c::Bool) where {M <: MonadPlus} = 
+    c ? mreturn(M, Unit()) : mzero(M, Unit)
+
+mzero(::Type{M}, ::Type{T}) where {T, M <: Monad} = M{T}()
 
 #
 #
@@ -94,7 +102,7 @@ function mdo_desugar_helper(rest, expr::Expr)
         expr
     else
         # replace with sequencing
-        :(mthen($rest, $expr))
+        :(mthen($expr, $rest))
     end
 end
 
@@ -102,6 +110,16 @@ end
 liftM{M<:Monad}(::Type{M}, f::Function) = m1 -> @mdo M begin
     x1 <| m1
     return f(x1)
+end
+
+# f :: T -> M S, res :: M [S]
+function mapM(::Type{M}, f :: Function, as :: Vector) where {M<:Monad} 
+    k = (a,r) -> @mdo M begin
+        x  <| f(a)
+        xs <| r
+        return(push!(xs, x))
+    end
+    foldr(k, mreturn(M, []), reverse(as))
 end
 
 #                                                       #
@@ -114,7 +132,7 @@ end
 ## Starting slow: Identity
 #
 
-type Identity{T} <: Monad{T}
+struct Identity{T} <: Monad{T}
     value :: T
 end
 
@@ -124,11 +142,12 @@ mbind(f::Function, m::Identity) = f(m.value)
 ## List
 #
 
-mutable struct MList{T} <: MonadPlus{T}
+struct MList{T} <: MonadPlus{T}
     value :: Vector{T}
     
     MList{T}(x :: Vector{T}) where T = new{T}(x)
     MList{T}(x :: T) where T = new{T}([x])
+    MList{T}() where T = new{T}(T[])
 end
 
 MList(x :: Vector{T}) where T = MList{T}(x)
@@ -144,8 +163,8 @@ end
 fmap(f::Function, m::MList) = MList(map(f, m.value))
 
 # It's also a MonadPlus
-mzero(::Type{MList}) = MList([])
-mplus(m1::MList, m2::MList) = join(MList([m1, m2]))
+
+mplus(m1::MList{T}, m2::MList{T}) where T = MList(vcat(m1.value, m2.value))
 
 import Base.==
 ==(l1 :: MList{T}, l2 :: MList{T}) where T =
@@ -155,18 +174,26 @@ import Base.==
 ## Maybe
 #
 
-mutable struct Maybe{T} <: Monad{T}
+struct Maybe{T} <: MonadPlus{T}
     value :: Union{T, Void}
+
+    Maybe{T}() where T = new{T}(nothing)
+    Maybe{T}(x :: T) where T = new{T}(x)
 end
 
+Maybe(x :: T) where T = Maybe{T}(x)
+
 mbind(f::Function, m::Maybe{T}) where T = 
-    isa(m.value, Nothing) ? Maybe{T}(nothing) : f(m.value)
+    isa(m.value, Void) ? Maybe{T}() : f(m.value)
+
+mplus(m1::Maybe{T}, m2::Maybe{T}) where T = 
+    isa(m1.value, T) ? m1 : m2
 
 #
 ## State
 #
 
-type State{T} <: Monad{T}
+struct State{T} <: Monad{T}
     runState :: Function # s -> (a, s)
 end
 state(f) = State(f)
