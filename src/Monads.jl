@@ -1,5 +1,7 @@
 module Monads
 
+import Base.==
+
 # types
 export Monad, Identity, MList, Maybe, State
 # combinators
@@ -28,6 +30,7 @@ mbind(f::Function, m::Monad) = join(fmap(f, m))
 mcomp(g::Function, f::Function) = x -> mbind(g, f(x))
 mthen(k::Monad, m::Monad) = mbind(_ -> k, m)
 (>>)(m::Monad, k::Monad) = mthen(k, m)
+(==)(m::Monad, k::Monad) = m.value == k.value
 
 ## A MonadPlus function
 guard{M<:MonadPlus}(::Type{M}, c::Bool) = c ? mreturn(M, nothing) : mzero(M)
