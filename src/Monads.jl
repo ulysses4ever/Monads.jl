@@ -1,11 +1,16 @@
 module Monads
 
-# types
+#
+#
+#    Interface
+#
+#
+# types: Monad and its instances
 export Monad, Identity, MList, Maybe, State
-# combinators
-export mreturn, join, fmap, bind, mcomp, mthen, (>>)
+# combinators (MOnad methods)
+export mreturn, join, fmap, mbind, mcomp, mthen, (>>)
 # utilities
-export liftM
+export liftM, Unit, mapM
 # do syntax
 export @mdo
 # MonadPlus
@@ -13,24 +18,45 @@ export MonadPlus, mzero, mplus, guard
 # State
 export runState, put, get, evalState, execState
 
-abstract Monad
-abstract MonadPlus <: Monad
+abstract type Monad{T} end 
+abstract type MonadPlus{T} <: Monad{T} end
+struct Unit end
+
+#
+#
+# Stubs for all monad methods
+#
+#
 
 ## Buy two monad combinators, get the third free!
-mreturn{M<:Monad}(::Type{M}, val) = M(val)
-join(m::Monad) = bind(identity, m)
-fmap{M<:Monad}(f::Function, m::M) = bind(m) do x
+mreturn(::Type{M}, val :: T) where {T, M<:Monad} = M{T}(val)
+
+join(m::Monad) = mbind(identity, m)
+
+fmap{M<:Monad}(f::Function, m::M) = mbind(m) do x
     mreturn(M, f(x))
 end
-bind(f::Function, m::Monad) = join(fmap(f, m))
+
+mbind(f::Function, m::Monad) = join(fmap(f, m))
 
 ## Extra combinators
-mcomp(g::Function, f::Function) = x -> bind(g, f(x))
-mthen(k::Monad, m::Monad) = bind(_ -> k, m)
-(>>)(m::Monad, k::Monad) = mthen(k, m)
+mcomp(g::Function, f::Function) = x -> mbind(g, f(x))
 
-## A MonadPlus function
-guard{M<:MonadPlus}(::Type{M}, c::Bool) = c ? mreturn(M, nothing) : mzero(M)
+mthen(m::Monad, k::Monad) = mbind(_ -> k, m)
+
+(>>)(m::Monad, k::Monad) = mthen(m, k)
+
+## MonadPlus functions
+guard(::Type{M}, c::Bool) where {M <: MonadPlus} = 
+    c ? mreturn(M, Unit()) : mzero(M, Unit)
+
+mzero(::Type{M}, ::Type{T}) where {T, M <: Monad} = M{T}()
+
+#
+#
+# Macro for do-blocks (implementation)
+#
+#
 
 ## Friendly monad blocks
 macro mdo(mtype, body)
@@ -55,10 +81,10 @@ end
 mdo_desugar(exprIn) = reduce(mdo_desugar_helper, :(), reverse(exprIn.args))
 mdo_desugar_helper(rest, expr) = rest
 function mdo_desugar_helper(rest, expr::Expr)
-    if expr.head == :call && expr.args[1] == :(<-)
-        # replace "<-" with monadic binding
+    if expr.head == :call && expr.args[1] == :(<|)
+        # replace "<|" with monadic binding
         quote
-            bind($(expr.args[3])) do $(expr.args[2])
+            mbind($(expr.args[3])) do $(expr.args[2])
                 $rest
             end
         end
@@ -76,67 +102,98 @@ function mdo_desugar_helper(rest, expr::Expr)
         expr
     else
         # replace with sequencing
-        :(mthen($rest, $expr))
+        :(mthen($expr, $rest))
     end
 end
 
 ## Function lifting
 liftM{M<:Monad}(::Type{M}, f::Function) = m1 -> @mdo M begin
-    x1 <- m1
+    x1 <| m1
     return f(x1)
 end
 
+# f :: T -> M S, res :: M [S]
+function mapM(::Type{M}, f :: Function, as :: Vector) where {M<:Monad} 
+    k = (a,r) -> @mdo M begin
+        x  <| f(a)
+        xs <| r
+        return(push!(xs, x))
+    end
+    foldr(k, mreturn(M, []), reverse(as))
+end
+
+#                                                       #
+#                                                       #
+#                      Monad instances                  #
+#                                                       #
+#                                                       #
+
+#
 ## Starting slow: Identity
-type Identity{T} <: Monad
+#
+
+struct Identity{T} <: Monad{T}
     value :: T
 end
 
-bind(f::Function, m::Identity) = f(m.value)
+mbind(f::Function, m::Identity) = f(m.value)
 
+#
 ## List
-type MList <: MonadPlus
-    value :: Vector
+#
 
-    MList(x::Array) = new(vec(x))
-    MList(x) = new([x])
+struct MList{T} <: MonadPlus{T}
+    value :: Vector{T}
+    
+    MList{T}(x :: Vector{T}) where T = new{T}(x)
+    MList{T}(x :: T) where T = new{T}([x])
+    MList{T}() where T = new{T}(T[])
 end
 
-function join(m::MList)
-    if !isempty(m.value)
-        val = nothing
-        for arr in m.value[1:end]
-            if !isempty(arr.value)
-                if val === nothing
-                    val = arr.value
-                else
-                    append!(val, arr.value)
-                end
-            end
-        end
-        if val === nothing
-            mzero(MList)
-        else
-            mreturn(MList, val)
-        end
-    else
-        mzero(MList)
-    end
+MList(x :: Vector{T}) where T = MList{T}(x)
+MList(x :: T) where T = MList{T}([x])
+
+function join(mm :: MList{MList{T}}) where T
+    MList{T}(
+     foldl(
+       (v,m) -> vcat(v, m.value), 
+       T[], 
+       mm.value))
 end
 fmap(f::Function, m::MList) = MList(map(f, m.value))
 
 # It's also a MonadPlus
-mzero(::Type{MList}) = MList([])
-mplus(m1::MList, m2::MList) = join(MList([m1, m2]))
 
+mplus(m1::MList{T}, m2::MList{T}) where T = MList(vcat(m1.value, m2.value))
+
+import Base.==
+==(l1 :: MList{T}, l2 :: MList{T}) where T =
+    l1.value == l2.value
+
+#
 ## Maybe
-type Maybe{T} <: Monad
-    value :: Union(T, Nothing)
+#
+
+struct Maybe{T} <: MonadPlus{T}
+    value :: Union{T, Void}
+
+    Maybe{T}() where T = new{T}(nothing)
+    Maybe{T}(x :: T) where T = new{T}(x)
 end
 
-bind(f::Function, m::Maybe) = isa(m.value, Nothing) ? Maybe(nothing) : f(m.value)
+Maybe(x :: T) where T = Maybe{T}(x)
 
+mbind(f::Function, m::Maybe{T}) where T = 
+    isa(m.value, Void) ? Maybe{T}() : f(m.value)
+
+mplus(m1::Maybe{T}, m2::Maybe{T}) where T = 
+    isa(m1.value, T) ? m1 : m2
+
+#
 ## State
-type State <: Monad
+#
+
+struct State{T} <: Monad{T}
     runState :: Function # s -> (a, s)
 end
 state(f) = State(f)
@@ -144,7 +201,7 @@ state(f) = State(f)
 runState(s::State) = s.runState
 runState(s::State, st) = s.runState(st)
 
-function bind(f::Function, s::State)
+function mbind(f::Function, s::State)
       state(st -> begin
           (x, stp) = runState(s, st)
           runState(f(x), stp)
@@ -160,3 +217,4 @@ evalState(s::State, st) = runState(s, st)[1]
 execState(s::State, st) = runState(s, st)[2]
 
 end
+
