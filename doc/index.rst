@@ -20,7 +20,7 @@ Using the list monad ``MList``, we can perform guarded list comprehensions::
            end
     MList([(1,2), (1,3), (2,1), (2,3), (3,1), (3,2)])
 
-This demonstrates the basic building blocks of a Julian monadic expression. ``@mdo`` opens the expression, followed by the name of the monad to compute in and a block with monadic computations. The ``<-`` operator is used to extract a value from a monad to use in a later step in the process. Combinators such as ``guard`` are automatically dispatched to the correct monad type, and the ``return`` expression wraps the final result.
+This demonstrates the basic building blocks of a Julian monadic expression. ``@mdo`` opens the expression, followed by the name of the monad to compute in and a block with monadic computations. The ``<-`` operator is used to extract a value from a monad to use in a later step in the process. Combinators such as ``guard`` are automatically dispatched to the correct monad type, and the ``mreturn`` expression wraps the final result.
 
 With the ``Maybe`` monad, we can immediately terminate a computation that produces ``nothing`` rather than throw an error.::
 

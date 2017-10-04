@@ -1,11 +1,9 @@
 module Monads
 
-import Base.bind;
-
 # types
 export Monad, Identity, MList, Maybe, State
 # combinators
-export mreturn, join, fmap, bind, mcomp, mthen, (>>)
+export mreturn, join, fmap, mbind, mcomp, mthen, (>>)
 # utilities
 export liftM
 # do syntax
@@ -20,15 +18,15 @@ abstract type MonadPlus <: Monad end
 
 ## Buy two monad combinators, get the third free!
 mreturn{M<:Monad}(::Type{M}, val) = M(val)
-join(m::Monad) = bind(identity, m)
-fmap{M<:Monad}(f::Function, m::M) = bind(m) do x
+join(m::Monad) = mbind(identity, m)
+fmap{M<:Monad}(f::Function, m::M) = mbind(m) do x
     mreturn(M, f(x))
 end
-bind(f::Function, m::Monad) = join(fmap(f, m))
+mbind(f::Function, m::Monad) = join(fmap(f, m))
 
 ## Extra combinators
-mcomp(g::Function, f::Function) = x -> bind(g, f(x))
-mthen(k::Monad, m::Monad) = bind(_ -> k, m)
+mcomp(g::Function, f::Function) = x -> mbind(g, f(x))
+mthen(k::Monad, m::Monad) = mbind(_ -> k, m)
 (>>)(m::Monad, k::Monad) = mthen(k, m)
 
 ## A MonadPlus function
@@ -63,7 +61,7 @@ function mdo_desugar_helper(rest, expr::Expr)
         # replace "<-" with monadic binding
         newExpr = expr.args[3].args[2:end];
         quote
-            bind($(newExpr...)) do $(expr.args[2])
+            mbind($(newExpr...)) do $(expr.args[2])
                 $rest
             end
         end
@@ -96,7 +94,7 @@ type Identity{T} <: Monad
     value :: T
 end
 
-bind(f::Function, m::Identity) = f(m.value)
+mbind(f::Function, m::Identity) = f(m.value)
 
 ## List
 type MList <: MonadPlus
@@ -129,7 +127,7 @@ function join(m::MList)
 end
 fmap(f::Function, m::MList) = MList(map(f, m.value))
 
-bind(f::Function, m::MList) = join(fmap(f, m))
+mbind(f::Function, m::MList) = join(fmap(f, m))
 
 # It's also a MonadPlus
 mzero(::Type{MList}) = MList([])
@@ -142,7 +140,7 @@ type Maybe{T} <: Monad
     value :: Union{T, Nothing}
 end
 
-bind(f::Function, m::Maybe) = isa(m.value, Nothing) ? Maybe(nothing) : f(m.value)
+mbind(f::Function, m::Maybe) = isa(m.value, Nothing) ? Maybe(nothing) : f(m.value)
 
 ## State
 type State <: Monad
@@ -153,7 +151,7 @@ state(f) = State(f)
 runState(s::State) = s.runState
 runState(s::State, st) = s.runState(st)
 
-function bind(f::Function, s::State)
+function mbind(f::Function, s::State)
       state(st -> begin
           (x, stp) = runState(s, st)
           runState(f(x), stp)
