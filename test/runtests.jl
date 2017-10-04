@@ -1,4 +1,3 @@
-include("./../src/Monads.jl");
 module Test
 
 using Monads
