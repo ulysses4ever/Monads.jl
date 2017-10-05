@@ -55,7 +55,7 @@ function mdo_patch(mtype, expr::Expr)
 end
 
 ## desugaring mdo syntax is a right fold
-mdo_desugar(exprIn) = reduce(mdo_desugar_helper, :(), reverse(exprIn.args))
+mdo_desugar(exprIn) = foldl(mdo_desugar_helper, :(), reverse(exprIn.args))
 mdo_desugar_helper(rest, expr) = rest
 function mdo_desugar_helper(rest, expr::Expr)
     if (expr.head == :call 
