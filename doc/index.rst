@@ -1,6 +1,9 @@
 Monads.jl --- Monadic Computation
 =================================
 
+.. image:: https://travis-ci.org/pao/Monads.jl.svg?branch=master
+    :target: https://travis-ci.org/pao/Monads.jl
+
 .. .. module:: Monads.jl
    :synopsis: Monadic computation primitives and combinators
 
