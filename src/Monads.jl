@@ -1,9 +1,10 @@
 module Monads
 
 import Base.==
+using Promisables
 
 # types
-export Monad, Identity, MList, Maybe, State
+export Monad, Identity, MList, Maybe, State, MPromise
 # combinators
 export mreturn, join, fmap, mbind, mcomp, mthen, (>>)
 # utilities
@@ -168,5 +169,11 @@ get() = state(st -> (st, st))
 
 evalState(s::State, st) = runState(s, st)[1]
 execState(s::State, st) = runState(s, st)[2]
+
+T1 = T where T <: Function
+function mbind(f::T1, m::Promise)
+  Then(f, m)
+end
+mreturn(::Type{Promise}, x) = Resolve(x);
 
 end

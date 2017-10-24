@@ -121,7 +121,7 @@ Methods
 Implementing a monad
 --------------------
 
-To implement your own monad, you will need to create a new type that is a subtype of either ``Monad`` or ``MonadPlus`` and implements either ``mbind`` and ``fmap``, or ``join``, each of which you will need to ``import`` from ``Monads``. The methods you define should obey the following rules::
+To implement your own monad, you will need to create a new type that is a subtype of either ``Monad`` or ``MonadPlus`` and implement either ``mbind`` and ``mreturn``, or ``fmap`` and ``join``, each of which you will need to ``import`` from ``Monads``. The methods you define should obey the following rules::
 
     mbind(f, mreturn(M, a))) == f(a)
 
