@@ -1,7 +1,6 @@
 module Monads
 
 import Base.==
-using Promisables
 
 # types
 export Monad, Identity, MList, Maybe, State, MPromise
@@ -20,9 +19,9 @@ abstract type Monad end
 abstract type MonadPlus <: Monad end
 
 ## Buy two monad combinators, get the third free!
-mreturn{M<:Monad}(::Type{M}, val) = M(val)
+mreturn(::Type{M}, val) where {M<:Monad} = M(val)
 join(m::Monad) = mbind(identity, m)
-fmap{M<:Monad}(f::Function, m::M) = mbind(m) do x
+fmap(f::Function, m::M) where {M<:Monad} = mbind(m) do x
     mreturn(M, f(x))
 end
 mbind(f::Function, m::Monad) = join(fmap(f, m))
@@ -34,7 +33,7 @@ mthen(k::Monad, m::Monad) = mbind(_ -> k, m)
 (==)(m::Monad, k::Monad) = m.value == k.value
 
 ## A MonadPlus function
-guard{M<:MonadPlus}(::Type{M}, c::Bool) = c ? mreturn(M, nothing) : mzero(M)
+guard(::Type{M}, c::Bool) where {M<:MonadPlus} = c ? mreturn(M, nothing) : mzero(M)
 
 ## Friendly monad blocks
 macro mdo(mtype, body)
@@ -88,20 +87,20 @@ function mdo_desugar_helper(expr::Expr, rest)
 end
 
 ## Function lifting
-liftM{M<:Monad}(::Type{M}, f::Function) = m1 -> @mdo M begin
+liftM(::Type{M}, f::Function) where {M<:Monad} = m1 -> @mdo M begin
     x1 <- m1
     return f(x1)
 end
 
 ## Starting slow: Identity
-type Identity{T} <: Monad
+struct Identity{T} <: Monad
     value :: T
 end
 
 mbind(f::Function, m::Identity) = f(m.value)
 
 ## List
-type MList <: MonadPlus
+struct MList <: MonadPlus
     value :: Vector
 
     MList(x::Array) = new(vec(x))
@@ -137,17 +136,17 @@ mbind(f::Function, m::MList) = join(fmap(f, m))
 mzero(::Type{MList}) = MList([])
 mplus(m1::MList, m2::MList) = join(MList([m1, m2]))
 
-type Nothing end
+struct Nothing end
 
 ## Maybe
-type Maybe{T} <: Monad
+struct Maybe{T} <: Monad
     value :: Union{T, Nothing}
 end
 
 mbind(f::Function, m::Maybe) = isa(m.value, Nothing) ? Maybe(nothing) : f(m.value)
 
 ## State
-type State <: Monad
+struct State <: Monad
     runState :: Function # s -> (a, s)
 end
 state(f) = State(f)
@@ -169,11 +168,5 @@ get() = state(st -> (st, st))
 
 evalState(s::State, st) = runState(s, st)[1]
 execState(s::State, st) = runState(s, st)[2]
-
-T1 = T where T <: Function
-function mbind(f::T1, m::Promise)
-  Then(f, m)
-end
-mreturn(::Type{Promise}, x) = Resolve(x);
 
 end
