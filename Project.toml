@@ -1,6 +1,6 @@
 name = "Monads"
 uuid = "4a446bee-a8a1-53bd-a908-d1601923a297"
-version = "0.2.1"
+version = "0.2.2"
 
 [compat]
 julia = "≥ 0.6.0"
