@@ -20,27 +20,3 @@ using Promisables
 
 end
 
-@testset "A promise monad" begin
-  @testset "must properly resolve and return a working promise" begin
-    p0 = Promise()
-    step1::Function = (x) -> Resolve(x+2);
-    step2::Function = (x) -> Resolve(x+2);
-
-    p = (@mdo Promise begin
-      x <- p0
-      y <- (step1(x))
-      z <- (step2(y))
-      return y + z
-    end)
-
-    Timer((t) -> begin
-      Fulfill(p0, 0)
-      close(t)
-    end, 2)
-
-    @pawait p
-    @test p.value == 6
-  end
-end
-
-end
