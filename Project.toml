@@ -1,6 +1,6 @@
 name = "Monads"
 uuid = "4a446bee-a8a1-53bd-a908-d1601923a297"
-version = "0.2.3"
+version = "0.2.4"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
