@@ -1,8 +1,8 @@
 Monads.jl --- Monadic Computation
 =================================
 
-.. image:: https://travis-ci.org/pao/Monads.jl.svg?branch=master
-    :target: https://travis-ci.org/pao/Monads.jl
+.. image:: https://github.com/pao/Monads.jl/workflows/CI/badge.svg
+    :target: https://github.com/pao/Monads.jl/actions?query=workflow%3ACI+branch%3Amaster
 
 .. .. module:: Monads.jl
    :synopsis: Monadic computation primitives and combinators
@@ -134,5 +134,4 @@ If your monad type is a subtype of ``MonadPlus``, it should also define the addi
     mbind(f, mzero) = mzero
     mthen(mzero, v) = mzero
 
-For more information, the definitive reference is the `Typeclassopedia <http://www.haskell.org/haskellwiki/Typeclassopedia>_`.
-
+For more information, the definitive reference is the `Typeclassopedia <http://www.haskell.org/haskellwiki/Typeclassopedia>`_.
