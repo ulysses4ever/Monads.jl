@@ -1,8 +1,5 @@
-module Test
-
 using Monads
-using Base.Test
-using Promisables
+using Test
 
 @testset "Tests for list monad (MList)" begin
     @test mreturn(MList, 1) == MList([1])
