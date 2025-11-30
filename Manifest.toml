@@ -1,0 +1,10 @@
+# This file is machine-generated - editing it directly is not advised
+
+julia_version = "1.12.1"
+manifest_format = "2.0"
+project_hash = "55c644f5451e5b4da00ba093ec08d05207167dfc"
+
+[[deps.Monads]]
+path = "."
+uuid = "4a446bee-a8a1-53bd-a908-d1601923a297"
+version = "0.2.4"
