@@ -56,7 +56,7 @@ end
 
 ## desugaring mdo syntax is a right fold
 mdo_desugar(exprIn) = foldr(mdo_desugar_helper, exprIn.args)
-mdo_desugar_helper(rest, expr) = rest
+mdo_desugar_helper(expr, rest) = rest
 function mdo_desugar_helper(expr::Expr, rest)
     if (expr.head == :call 
       && expr.args[1] == Symbol("<")
